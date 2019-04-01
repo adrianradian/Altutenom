@@ -32,7 +32,8 @@ func Network(
 
 	//disconnected := true
 	myId, _ := strconv.Atoi(id) 
-	NumberOfPrevPrevPeers := 0
+	numberOfPrevPrevPeers := 0
+	haveInternetConnection := false
 	var peerInfo PeerUpdate
 	var lastOrderReceived Orders 
 	var unconfirmedOrdersMatrix [N_FLOORS][3] UnconfirmedOrder
@@ -52,10 +53,18 @@ func Network(
 	for {
 		select {
 		case orderToShare := <-orderFromOrderHandlerCh:
-			if (orderToShare.ElevToExecute == myId) && (unconfirmedOrdersMatrix[orderToShare.Floor][orderToShare.Button].Active == false) { 
+			if haveInternetConnection {
+				if (orderToShare.ElevToExecute == myId) && (unconfirmedOrdersMatrix[orderToShare.Floor][orderToShare.Button].Active == false) { 
+				fmt.Println("Min ordre!")
 				unconfirmedOrdersMatrix[orderToShare.Floor][orderToShare.Button] = activateUnconfirmedOrder(orderToShare, len(peerInfo.Peers))
+				}
+				orderTxCh <- orderToShare
+			} else if orderToShare.Button == 2 {
+				orderToOrderHandlerCh <- orderToShare
+				lightOrder := [3]int{orderToShare.Floor, orderToShare.Button, orderToShare.ElevToExecute}
+				setLightCh <- lightOrder
 			}
-			orderTxCh <- orderToShare
+			
 		case receivedOrder := <- orderRxCh:
 			lastOrderReceived = receivedOrder
 			lastOrderReceived.ElevToExecute = myId
@@ -65,8 +74,10 @@ func Network(
 				unconfirmedOrdersMatrix[receivedOrder.Floor][receivedOrder.Button] = activateUnconfirmedOrder(receivedOrder, len(peerInfo.Peers))
 			}
 			ack := createAcknowledgement(receivedOrder, myId) 
+			fmt.Println("Sending ack!")
 			ackOrderTxCh <- ack
 		case ack := <- ackOrderRxCh:
+			fmt.Println("Getting ack!")
 			if unconfirmedOrdersMatrix[ack.Floor][ack.Button].Active == true {
 				index, indexError := correspondingIndex(peerInfo.Peers, ack.From)
 				if (indexError == "nil") && (index < len(unconfirmedOrdersMatrix[ack.Floor][ack.Button].ReceivedAcks)) {
@@ -76,11 +87,14 @@ func Network(
 				}
 				// We check if we have received acknowledgements from all the other elevators
 				fmt.Println(unconfirmedOrdersMatrix[ack.Floor][ack.Button].ReceivedAcks)
+				fmt.Println("Before sum!")
 				if sum(unconfirmedOrdersMatrix[ack.Floor][ack.Button].ReceivedAcks) == (len(peerInfo.Peers)) {
+					fmt.Println("After sum!")
 					unconfirmedOrdersMatrix[ack.Floor][ack.Button].Active = false
 					orderToOrderHandlerCh <- unconfirmedOrdersMatrix[ack.Floor][ack.Button].OrderToShare
 					lightOrder := [3]int{ack.Floor, ack.Button, ack.ElevToExecute}
 					if (unconfirmedOrdersMatrix[ack.Floor][ack.Button].OrderToShare.NewOrder == true) {
+						fmt.Println("Sending conf!")
 						lightOrderTxCh <- lightOrder
 						setLightCh <- lightOrder
 					}
@@ -91,11 +105,13 @@ func Network(
 		case latestPeerInfo := <-peerUpdateCh:
 
 			// The old orders are shared with the newest elevators
-			if (NumberOfPrevPrevPeers >= 3) {
+			if (numberOfPrevPrevPeers >= 3) {
 				unconfirmedOrdersMatrix[lastOrderReceived.Floor][lastOrderReceived.Button] = activateUnconfirmedOrder(lastOrderReceived, len(latestPeerInfo.Peers))
 			}
-
-			NumberOfPrevPrevPeers = len(peerInfo.Peers)
+			if len(latestPeerInfo.Peers) > 1 {
+				haveInternetConnection = true
+			}
+			numberOfPrevPrevPeers = len(peerInfo.Peers)
 			peerInfo = latestPeerInfo
 			sendPeerCh <- peerInfo
 

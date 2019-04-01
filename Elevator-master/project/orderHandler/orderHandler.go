@@ -17,7 +17,7 @@ func OrderHandler(orderToNetworkCh chan<- Orders,
 	myId, _ := strconv.Atoi(ourId)
 	var orderInfo Orders
 	var peersAlive []int
-
+	//connected := false
 	buttonEventCh := make(chan elevio.ButtonEvent)
 
 	go elevio.PollButtons(buttonEventCh)
@@ -47,10 +47,15 @@ func OrderHandler(orderToNetworkCh chan<- Orders,
 				newOrderInfo.Floor = BT_Press.Floor
 				newOrderInfo.Button = fromButtonTypeToInt(BT_Press.Button)
 				newOrderInfo.NewOrder = true
+				/*if !connected {
+					elevio.SetButtonLamp(BT_Press.Button, BT_Press.Floor, true)
+					ordersToFSMCh <- newOrderInfo.ElevInfos[myId]
+				} else {*/
+				fmt.Println("KOMMER HIT!")
 				orderToNetworkCh <- newOrderInfo
 			}
-
 		case newOrderInfo := <-orderFromNetworkCh:
+			fmt.Println("Får tilbake!")
 			orderInfo = updateOrders(newOrderInfo,orderInfo)
 			for _, k := range peersAlive{
 				if k != myId {
@@ -59,7 +64,9 @@ func OrderHandler(orderToNetworkCh chan<- Orders,
 					orderInfo.ElevInfos[k].LastFloor = newOrderInfo.ElevInfos[k].LastFloor
 				}
 			}
+
 			updateLightsOff(orderInfo,peersAlive,myId)
+			fmt.Println("Sender til FSM!")
 			ordersToFSMCh <- orderInfo.ElevInfos[myId]
 
 		case orderComp := <-ordersFromFSMCh:
@@ -69,7 +76,7 @@ func OrderHandler(orderToNetworkCh chan<- Orders,
 					orderInfo = removeHallCalls(orderInfo, myId)
 					orderInfo.NewOrder = true
 					orderInfo.Floor = 0
-					orderInfo.Button = 1
+					orderInfo.Button = fromButtonTypeToInt(elevio.BT_HallDown)
 				} else {
 					updateLightsOff(orderInfo, peersAlive, myId)
 					orderInfo.Floor = orderComp.LastFloor
@@ -106,6 +113,9 @@ func OrderHandler(orderToNetworkCh chan<- Orders,
 				orderInfo = removeHallCalls(orderInfo, myId)
 				updateLightsOff(orderInfo, newPeersAlive, myId)
 				ordersToFSMCh <- orderInfo.ElevInfos[myId]
+				/*/connected = false
+			} else {
+				connected = true*/
 			}
 			peersAlive = newPeersAlive
 			
