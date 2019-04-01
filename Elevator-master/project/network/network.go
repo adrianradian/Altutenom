@@ -110,6 +110,8 @@ func Network(
 			}
 			if len(latestPeerInfo.Peers) > 1 {
 				haveInternetConnection = true
+			} else if len(latestPeerInfo.Peers) <= 1 {
+				haveInternetConnection = false	
 			}
 			numberOfPrevPrevPeers = len(peerInfo.Peers)
 			peerInfo = latestPeerInfo
