@@ -1,6 +1,9 @@
 # TTK4145 - Elevator project
 
 ## Compiling
+A peer to peer system is implemented consisting of a Network module, a module to handle orders and a FSM module.
+
+## Compiling
 When compiling main.go, two flags need to be passed as argument `go run main.go -id=# -port=localhost:######`, where the # represents an int.
 
 ## Type definitions for the project
