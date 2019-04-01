@@ -1,6 +1,6 @@
 # TTK4145 - Elevator project
 
-## Compiling
+## Overview
 A peer to peer system is implemented consisting of a Network module, a module to handle orders and a FSM module.
 
 ## Compiling
